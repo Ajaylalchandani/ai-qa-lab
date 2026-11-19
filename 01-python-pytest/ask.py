@@ -37,13 +37,12 @@ answer = data["response"]
 record = {
     "timestamp": datetime.now(timezone.utc).isoformat(),
     "model": model,
-    "prompt": question,
-    "response": answer,
+    "question": question,
+    "answer": answer,
     "tokens_in": data["prompt_eval_count"],
     "tokens_out": data["eval_count"],
-    "elapsed_time": elapsed,
-}   
-
+    "latency_s": round(elapsed, 2),
+}
 # NEW: append it as one line to log.jsonl, next to this script
 log_file = Path(__file__).parent / "log.jsonl"
 
