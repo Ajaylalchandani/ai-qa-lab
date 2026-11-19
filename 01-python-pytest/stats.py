@@ -1,32 +1,32 @@
 import json
 from pathlib import Path
 
-# 1. Find the log file next to this script
 log_file = Path(__file__).parent / "log.jsonl"
 
-# 2. Read every line into a list of dicts
 records = []
-for line in open(log_file, "r", encoding="utf-8"):
-    record = json.loads(line)
-    records.append(record)
+for line in open(log_file, encoding="utf-8"):
+    records.append(json.loads(line))
 
-# 3. Calculate the stats
+if not records:
+    print("No records found.")
+    exit()
+
+ok = [r for r in records if r.get("status", "ok") == "ok"]
+errors = [r for r in records if r.get("status") == "error"]
 
 runs = len(records)
-total_latency = sum(r["latency_s"] for r in records)
+error_rate = len(errors) / runs * 100
 
-# TODO: average latency = total divided by number of runs
-average_latency = total_latency / runs if runs > 0 else 0
+print(f"Runs: {runs} (ok: {len(ok)}, errors: {len(errors)})")
+print(f"Error rate: {error_rate:.1f}%")
 
-slowest = max(records, key=lambda r: r["latency_s"])
-# TODO: total tokens out (hint: same pattern as total_latency)
-total_tokens_out = sum(r["tokens_out"] for r in records)
+if ok:
+    avg = sum(r["latency_s"] for r in ok) / len(ok)
+    slowest = max(ok, key=lambda r: r["latency_s"])
+    tokens = sum(r["tokens_out"] or 0 for r in ok)
+    print(f"Average latency (ok runs): {avg:.2f}s")
+    print(f'Slowest: {slowest["latency_s"]}s ("{slowest["question"]}")')
+    print(f"Total tokens out: {tokens}")
 
-# 4. Print the report
-print(f"Runs: {runs}")
-
-# TODO: print average latency with 2 decimals, e.g. "Average latency: 2.13s"
-print(f"Average latency: {average_latency:.2f}s")
-
-print(f'Slowest: {slowest["latency_s"]}s ("{slowest["question"]}")')
-print(f"Total tokens out: {total_tokens_out}")
+for r in errors:
+    print(f'  ERROR: {r["error"]}  ("{r["question"]}")')

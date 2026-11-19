@@ -11,6 +11,26 @@ load_dotenv()
 PROVIDER = os.getenv("PROVIDER", "ollama")
 TIMEOUT_S = 120
 
+def write_log(record):
+    log_file = Path(__file__).parent / "log.jsonl"
+    with open(log_file, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record) + "\n")
+
+def fail(message):
+    elapsed = time.perf_counter() - start
+    write_log({
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "provider": PROVIDER,
+        "question": question,
+        "status": "error",  
+        "error": message,
+        "latency_s": round(elapsed, 2),
+    })
+    print(message)
+    sys.exit(2)
+    
+
+
 def ask_ollama(question):
     model = "llama3.2"
     payload = {"model": model, "prompt": question, "stream": False}
@@ -44,17 +64,17 @@ start = time.perf_counter()
 try:
     model, answer, tokens_in, tokens_out = ask(question)    
 except httpx.ConnectError:
-    print("Cannot reach Ollama at localhost:11434. Is it running?")
-    sys.exit(2)
+    fail("Cannot reach Ollama at localhost:11434. Is it running?")
+
 except KeyError as e:
-    print(f"Missing setting {e}: add it to your .env file")
-    sys.exit(2)
+    fail(f"Missing setting {e}: add it to your .env file")
+
 except httpx.HTTPStatusError as e:
-    print(f"HTTP error: {e.response.status_code} - {e.response.text}")
-    sys.exit(2)
+    fail(f"HTTP {e.response.status_code} from {PROVIDER}")
+
 except httpx.ConnectTimeout:
-    print(f"Request timed out after {TIMEOUT_S} seconds")
-    sys.exit(2)
+    fail(f"Request timed out after {TIMEOUT_S} seconds.")
+
 
 elapsed = time.perf_counter() - start
 
@@ -67,11 +87,11 @@ record = {
     "tokens_in": tokens_in,
     "tokens_out": tokens_out,
     "latency_s": round(elapsed, 2),
+    "status": "ok",
 }
 
-log_file = Path(__file__).parent / "log.jsonl"
-with open(log_file, "a", encoding="utf-8") as f:
-    f.write(json.dumps(record) + "\n")
+write_log(record)
+
 
 print(answer)
 print(f"[{PROVIDER}/{model}] tokens in: {tokens_in}, out: {tokens_out}, latency: {elapsed:.2f}s")
