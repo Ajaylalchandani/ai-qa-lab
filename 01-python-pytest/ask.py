@@ -1,10 +1,19 @@
 import httpx
+import sys
+
+
+if len(sys.argv) < 2:
+    print("Usage: python ask.py <question>")
+    sys.exit(1)
+question = " ".join(sys.argv[1:])
+
+
 
 url = "http://localhost:11434/api/generate"
 
 payload = {
     "model": "llama3.2",
-    "prompt": "Explain what Playwright is in one sentence.",
+    "prompt": question,
     "stream": False,
 }
 
