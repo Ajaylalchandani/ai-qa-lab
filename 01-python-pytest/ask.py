@@ -9,12 +9,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 PROVIDER = os.getenv("PROVIDER", "ollama")
-
+TIMEOUT_S = 120
 
 def ask_ollama(question):
     model = "llama3.2"
     payload = {"model": model, "prompt": question, "stream": False}
-    r = httpx.post("http://localhost:11434/api/generate", json=payload, timeout=120)
+    r = httpx.post("http://localhost:11434/api/generate", json=payload, timeout=TIMEOUT_S)
     r.raise_for_status()
     data = r.json()
     return model, data["response"], data["prompt_eval_count"], data["eval_count"]
@@ -25,7 +25,7 @@ def ask_gemini(question):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
     headers = {"x-goog-api-key": os.environ["GEMINI_API_KEY"]}
     body = {"contents": [{"parts": [{"text": question}]}]}
-    r = httpx.post(url, headers=headers, json=body, timeout=120)
+    r = httpx.post(url, headers=headers, json=body, timeout=TIMEOUT_S)
     r.raise_for_status()
     data = r.json()
     answer = data["candidates"][0]["content"]["parts"][0]["text"]
@@ -41,7 +41,21 @@ question = " ".join(sys.argv[1:])
 ask = ask_gemini if PROVIDER == "gemini" else ask_ollama
 
 start = time.perf_counter()
-model, answer, tokens_in, tokens_out = ask(question)
+try:
+    model, answer, tokens_in, tokens_out = ask(question)    
+except httpx.ConnectError:
+    print("Cannot reach Ollama at localhost:11434. Is it running?")
+    sys.exit(2)
+except KeyError as e:
+    print(f"Missing setting {e}: add it to your .env file")
+    sys.exit(2)
+except httpx.HTTPStatusError as e:
+    print(f"HTTP error: {e.response.status_code} - {e.response.text}")
+    sys.exit(2)
+except httpx.ConnectTimeout:
+    print(f"Request timed out after {TIMEOUT_S} seconds")
+    sys.exit(2)
+
 elapsed = time.perf_counter() - start
 
 record = {
